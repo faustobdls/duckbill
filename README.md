@@ -1,95 +1,78 @@
 # 🦆 Duckbill
 
-Duckbill is a privacy-first, blazing-fast AI Agent CLI and Server built in Dart. It allows you to run AI agents remotely, connect multiple API providers, and execute Model Context Protocols (MCPs) with granular, user-controlled permissions.
+Duckbill é uma CLI e Server AI **Privacy-first** escrito nativamente em Dart para alta performance. Ele permite que você execute agentes baseados em Inteligência Artificial remotamente, criando túneis seguros e viabilizando a execução autônoma de comandos na sua máquina (via MCPs - Model Context Protocols) com permissão granular e segurança robusta.
 
-## ✨ Features
+_Leia em outros idiomas: [English](README-en.md), [Español](README-es.md)._
 
-- **Privacy First:** Minimal data collection. You are always in control of what the AI can see and execute.
-- **N-N Architecture:** Connect multiple CLIs to multiple servers seamlessly.
-- **High-Performance:** Compiled ahead-of-time (AOT) to single static binaries. Runs anywhere, even on Alpine Linux.
-- **Secure Tunneling:** WebSocket communication with TLS Pinning, HMAC-SHA256 payload signing, and strict 3-minute TTL requests.
-- **Token Authentication:** Secure Personal Access Tokens (PATs) starting with `dbk_`.
-- **Mini-Store:** Built-in SQLite-powered cache for sharing and installing remote skills and MCPs.
+## ✨ Funcionalidades
 
-## 🚀 Installation
-
-Download the latest binary for your architecture (ARM64 or x86_64) from the [Releases](https://github.com/youruser/duckbill/releases) page.
-
-```bash
-# Example for Linux/macOS
-curl -LO [https://github.com/youruser/duckbill/releases/latest/download/duckbill-linux-amd64](https://github.com/youruser/duckbill/releases/latest/download/duckbill-linux-amd64)
-chmod +x duckbill-linux-amd64
-sudo mv duckbill-linux-amd64 /usr/local/bin/duckbill
-```
-
-## 🛠️ Usage
-
-Authentication
-Login securely to a Duckbill Server using your token:
-
-```bash
-duckbill auth login --token dbk_YOUR_TOKEN_HERE
-```
-
-Tokens are encrypted locally using AES-256-GCM and stored in ~/.duckbill/keys/.
-
-Running the Server
-Start a lightweight, high-concurrency Duckbill server:
-
-```bash
-duckbill server start --port 8080
-```
-
-## 📂 Configuration Structure
-
-Duckbill keeps your environment clean by isolating configurations in ~/.duckbill/:
-
-- config.json: General CLI settings.
-- rules.json: Strict execution permissions.
-- mcp.json & remote-skills.json: Installed capabilities.
-- cache/: Downloaded remote assets.
-
-## 🤝 Contributing
-
-Duckbill is Open Source. PRs are welcome! See our contribution guidelines for details on compiling the Dart source code.
+- **Privacy First:** Menos coleta de dados, você decide e isola a execução da IA.
+- **Arquitetura N-N:** Conecte múltiplos terminais (CLIs) a vários servidores.
+- **IA Autônoma & Raciocínio Profundo:** Por padrão, utiliza o `gemini-3-flash-preview` com configurações de "Thinking Level" em ALTA (HIGH) capacidade para tomar decisões de comandos operacionais adequadas para a sua máquina hospedeira.
+- **Túnel Seguro de WebSocket:** Criptografia de payloads em transição, TLS Pinning e validação HMAC-SHA256 para cada mensagem com tempo de vida TTL.
+- **Armazenamento de Senhas Local:** Os PATs (Personal Access Tokens) são isolados e guardados via AES-256-GCM.
+- **Storage Otimizado:** Banco de dados SQLite usando interfaces de sistema (FFI C++) com journaling em WAL para sustentar conexões de dezenas de instâncias com alta concorrência.
 
 ---
 
-### 3. Recomendações de Skills e MCPs
+## 🛠️ Alterações do Plano Arquitetural Original
 
-Salve como `skills-and-mcps.md` para instruir o agente sobre as ferramentas iniciais a serem implementadas.
+Para adequar o projeto à realidade nativa mais rápida do ecossistema e abstração de FFI, o design original sofreu sutis adaptações arquiteturais:
 
-```markdown
-# Catálogo Inicial - Duckbill Mini-Store
+1. **Estrutura de Pastas Ajustada:** Ao invés das aplicações estarem na subpasta `apps/` e os pacotes todos em um mega pacote core, diluímos os pilares em bibliotecas atômicas (`packages/duckbill_ai`, `packages/duckbill_crypto`, `packages/duckbill_protocol` e `packages/duckbill_storage`) e alocamos a CLI e o Server nas gavetas-raíz `cli/` e `server/`. Isso evitou poluição de injeção de dependências.
+2. **Sistema de Compilação:** O plano original previa usar `dart compile exe`. Visto que agora trazemos FFI e Native Assets do SQLite3, a pipeline de compilação migrou para a solução moderna `dart build cli`, que extrai o cache dinâmico (dylib/so) para a mesma pasta do binário.
+3. **Poder Autônomo Embutido:** A IA não retorna apenas texto limpo. Ela foi programada para gerar payloads JSON baseados nas permissões requisitadas, enviando os pacotes `.sh`/`bash` ao servidor diretamente preko WebSocket N-N.
 
-## Model Context Protocols (MCPs)
+---
 
-1. **`duckbill-sqlite-mcp`**: Permite que a IA consulte e analise bancos de dados SQLite locais do usuário de forma segura, mediante aprovação explícita.
-2. **`duckbill-fs-mcp`**: Acesso controlado ao sistema de arquivos. Regra estrita: leitura restrita ao diretório de trabalho atual (PWD), proibido acesso à raiz do sistema ou arquivos de sistema (ex: `/etc`).
-3. **`duckbill-github-mcp`**: Integração com API do GitHub para ler PRs, issues e repositórios diretamente, evitando a necessidade de clonar o código localmente.
+## 💻 Desenvolvimento Local (Como rodar na sua máquina)
 
-## Core Skills (Ferramentas Nativas)
+Durante o desenvolvimento, basta executar os códigos primários do Dart com Hot Restart e JIT compilation usando comandos simples na raiz do seu terminal.
 
-1. **`shell_execute`**: Skill base para execução de comandos no terminal. Requer confirmação explícita do usuário (Y/n) no console da CLI antes de enviar o retorno pelo túnel, a menos que o comando esteja na _whitelist_ do `~/.duckbill/rules.json`.
-2. **`fetch_url`**: Skill que baixa o conteúdo de uma URL, converte o HTML para Markdown puro, removendo tags desnecessárias, e alimenta o contexto da IA via túnel.
-3. **`install_mcp`**: Permite à IA consultar o SQLite da mini-store no servidor e sugerir ao usuário a instalação de um novo MCP sob demanda via _lazy load_ para a pasta `~/.duckbill/cache/`.
+1. **Inicie o servidor localmente:**
+   Navegue até o servidor, defina sua chave da IA via variável de ambiente, e rode-o na porta padrão (8080):
+
+```bash
+cd server
+export GEMINI_API_KEY="SUA_CHAVE_GEMINI"
+dart run bin/server.dart
 ```
 
-### 4. Estrutura de Pastas Base (Monorepo Dart)
+2. **Gere sua primeira chave PAT de autenticação (Terminal Paralelo):**
 
-Forneça isso ao agente para que ele saiba como estruturar os pacotes internamente para reaproveitamento de código entre a CLI e o Servidor.
-
+```bash
+cd cli
+dart run bin/cli.dart auth login --token SEU_TOKEN_SECRETO
 ```
-duckbill/
-├── .github/
-│   └── workflows/
-│       └── build.yml          # Actions para compilar ARM64/x86_64
-├── packages/
-│   ├── duckbill_core/         # Lógica compartilhada: Criptografia, HMAC, Models, Auth
-│   └── duckbill_protocol/     # Definição do WebSocket, Handshake e Túnel
-├── apps/
-│   ├── duckbill_cli/          # Aplicação CLI (Injeção de dependência, UI de terminal)
-│   └── duckbill_server/       # Aplicação Servidor (Conexão com IA, SQLite, Gerenciamento N-N)
-├── .duckbill-context.md
-└── README.md
+
+3. **Se comunique através da CLI para o Server via Tunnel:**
+
+```bash
+cd cli
+dart run bin/cli.dart agent run "Verifique o espaço em disco."
+```
+
+---
+
+## 🚀 Compilação e Deploy (Produção)
+
+Não se preocupe com a compilação cruzada na sua máquina de uso diário. Nós preparamos uma esteira de Integração Contínua (CI/CD) usando **GitHub Actions**.
+
+Assim que você realizar um push na branch `main`, os corredores Ubuntu remotos rodarão o analisador, relatórios de testes (`lcov`), gerarão toda a compilação nativa AOT para sua pipeline e fornecerão o **Duckbill Bundle** comprimido em artefatos `.tar.gz`.
+
+Baixe a release do Duckbill com o bundle nativo amarrado com libs C++ de banco:
+
+```bash
+# Baixe a versão (Modifique a URL para a correspondente do Repositório)
+curl -LO https://github.com/seurepo/duckbill/releases/latest/download/duckbill-server-linux-amd64.tar.gz
+
+# Extraia o banco de dados nativo em loopback
+mkdir -p /DATA/.local/opt/duckbill
+tar -xzf duckbill-server-linux-amd64.tar.gz -C /DATA/.local/opt/duckbill
+
+# Gere o Symlink do executável final
+ln -s /DATA/.local/opt/duckbill/bin/server /DATA/.local/bin/duckbill
+
+# Rode via comando universal!
+duckbill
 ```
