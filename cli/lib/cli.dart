@@ -3,6 +3,9 @@ import 'package:args/command_runner.dart';
 import 'package:duckbill_crypto/duckbill_crypto.dart';
 import 'package:server/server.dart';
 
+import 'src/version.dart';
+import 'src/updater.dart';
+
 class AuthLoginCommand extends Command {
   @override
   final name = 'login';
@@ -166,11 +169,47 @@ class AgentCommand extends Command {
   }
 }
 
+class UpdateCommand extends Command {
+  @override
+  final name = 'update';
+  @override
+  final description = 'Checks for updates and self-updates the binary.';
+
+  UpdateCommand() {
+    argParser.addOption('repo', abbr: 'r', help: 'GitHub repository', defaultsTo: duckbillRepo);
+    argParser.addOption('type', abbr: 't', help: 'Binary type (cli or server)', defaultsTo: 'server');
+  }
+
+  @override
+  void run() async {
+    final repo = argResults?['repo'] as String? ?? duckbillRepo;
+    final binaryType = argResults?['type'] as String? ?? 'server';
+    final updater = DuckbillUpdater(repo: repo);
+    await updater.run(binaryType: binaryType);
+  }
+}
+
+class VersionCommand extends Command {
+  @override
+  final name = 'version';
+  @override
+  final description = 'Prints the current Duckbill version.';
+
+  @override
+  void run() {
+    print('🦆 Duckbill v$duckbillVersion');
+    print('Platform: ${DuckbillUpdater.platformArch}');
+    print('Repo: https://github.com/$duckbillRepo');
+  }
+}
+
 void mainWrapper(List<String> arguments) async {
-  final runner = CommandRunner('duckbill', 'Duckbill CLI for AI orchestration.')
+  final runner = CommandRunner('duckbill', 'Duckbill CLI v$duckbillVersion — AI orchestration.')
     ..addCommand(AuthCommand())
     ..addCommand(ServerCommand())
-    ..addCommand(AgentCommand());
+    ..addCommand(AgentCommand())
+    ..addCommand(UpdateCommand())
+    ..addCommand(VersionCommand());
     
   try {
     await runner.run(arguments);
