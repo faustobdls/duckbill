@@ -1,4 +1,6 @@
 build*
+!.github/
+!.github/**
 coverage
 *.sqlite*
 pubspec.lock

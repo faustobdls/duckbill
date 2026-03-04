@@ -1,0 +1,230 @@
+name: Build and Test Duckbill
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+env:
+  DART_SDK: stable
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: Lint, Analyze & Test (roda em tudo)
+  # ─────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ env.DART_SDK }}
+
+      - name: Install Dependencies
+        run: |
+          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
+            cd $dir && dart pub get && cd $GITHUB_WORKSPACE
+          done
+
+      - name: Analyze Code
+        run: |
+          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
+            cd $dir && dart analyze && cd $GITHUB_WORKSPACE
+          done
+
+      - name: Run Tests
+        run: |
+          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
+            cd $dir && dart test && cd $GITHUB_WORKSPACE
+          done
+
+  # ─────────────────────────────────────────────
+  # Job 2: Build Matrix (multi-os, multi-arch)
+  # Roda somente em push na main ou em tags v*
+  # ─────────────────────────────────────────────
+  build:
+    needs: test
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - os: ubuntu-latest
+            arch: x86_64
+            platform: linux
+          # Linux ARM64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            platform: linux
+          # macOS x86_64 (Intel)
+          - os: macos-13
+            arch: x86_64
+            platform: macos
+          # macOS ARM64 (Apple Silicon)
+          - os: macos-latest
+            arch: arm64
+            platform: macos
+          # Windows x86_64
+          - os: windows-latest
+            arch: x86_64
+            platform: windows
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ env.DART_SDK }}
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
+            cd $dir && dart pub get && cd $GITHUB_WORKSPACE
+          done
+
+      - name: Stamp Version from Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Stamping version: $VERSION"
+          sed -i.bak "s/const String duckbillVersion = '.*'/const String duckbillVersion = '$VERSION'/" cli/lib/src/version.dart
+          cat cli/lib/src/version.dart
+
+      - name: Compile CLI
+        shell: bash
+        run: |
+          cd cli
+          dart build cli -o build
+
+      - name: Compile Server
+        shell: bash
+        run: |
+          cd server
+          dart build cli -o build
+
+      - name: Package Bundles (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          tar -czf duckbill-cli-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C cli/build/bundle .
+          tar -czf duckbill-server-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C server/build/bundle .
+
+      - name: Package Bundles (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path cli/build/bundle/* -DestinationPath duckbill-cli-windows-${{ matrix.arch }}.zip
+          Compress-Archive -Path server/build/bundle/* -DestinationPath duckbill-server-windows-${{ matrix.arch }}.zip
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckbill-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            duckbill-cli-*
+            duckbill-server-*
+
+  # ─────────────────────────────────────────────
+  # Job 3: Release (somente em tags v*)
+  # Gera changelog, cria tag e publica release
+  # ─────────────────────────────────────────────
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous Tag
+        id: prev_tag
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | grep '^v' | head -n 2 | tail -n 1)
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          echo "Previous tag: $PREV_TAG"
+
+      - name: Get Current Tag
+        id: current_tag
+        run: |
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
+          echo "Current tag: $CURRENT_TAG"
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV="${{ steps.prev_tag.outputs.tag }}"
+          CURRENT="${{ steps.current_tag.outputs.tag }}"
+
+          echo "## 🦆 Duckbill $CURRENT" > CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          echo "### 📋 Changelog (diff from \`$PREV\`)" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+
+          # Commits agrupados por tipo (feat, fix, chore, etc.)
+          for prefix in feat fix refactor perf chore docs test ci; do
+            COMMITS=$(git log "$PREV".."$CURRENT" --pretty=format:"- %s (%h)" --grep="^$prefix" 2>/dev/null || true)
+            if [ -n "$COMMITS" ]; then
+              LABEL=$(echo "$prefix" | sed 's/feat/✨ Features/;s/fix/🐛 Bug Fixes/;s/refactor/♻️ Refactors/;s/perf/⚡ Performance/;s/chore/🔧 Chores/;s/docs/📝 Docs/;s/test/🧪 Tests/;s/ci/🏗️ CI/')
+              echo "#### $LABEL" >> CHANGELOG_RELEASE.md
+              echo "$COMMITS" >> CHANGELOG_RELEASE.md
+              echo "" >> CHANGELOG_RELEASE.md
+            fi
+          done
+
+          # Commits sem prefixo convencional
+          OTHER_COMMITS=$(git log "$PREV".."$CURRENT" --pretty=format:"- %s (%h)" --invert-grep --grep="^feat\|^fix\|^refactor\|^perf\|^chore\|^docs\|^test\|^ci" 2>/dev/null || true)
+          if [ -n "$OTHER_COMMITS" ]; then
+            echo "#### 📦 Other Changes" >> CHANGELOG_RELEASE.md
+            echo "$OTHER_COMMITS" >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+          fi
+
+          echo "---" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          echo "### 📊 Stats" >> CHANGELOG_RELEASE.md
+          echo "\`\`\`" >> CHANGELOG_RELEASE.md
+          git diff --stat "$PREV".."$CURRENT" >> CHANGELOG_RELEASE.md
+          echo "\`\`\`" >> CHANGELOG_RELEASE.md
+
+          cat CHANGELOG_RELEASE.md
+
+      - name: Download All Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: false
+
+      - name: Collect Release Files
+        run: |
+          mkdir -p release-files
+          find release-assets -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.current_tag.outputs.tag }}
+          name: '🦆 Duckbill ${{ steps.current_tag.outputs.tag }}'
+          body_path: CHANGELOG_RELEASE.md
+          draft: false
+          prerelease: ${{ contains(steps.current_tag.outputs.tag, '-rc') || contains(steps.current_tag.outputs.tag, '-beta') || contains(steps.current_tag.outputs.tag, '-alpha') }}
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
