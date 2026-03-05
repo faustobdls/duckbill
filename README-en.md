@@ -1,78 +1,182 @@
 # 🦆 Duckbill
 
-Duckbill is a **Privacy-first** AI Server and CLI natively written in Dart to ensure high-performance capabilities. It allows you to run AI-powered autonomous agents remotely, creating secure tunnels to perform automated system executions natively on your machine via Model Context Protocols (MCPs) coupled with fine-grained granular secure permissions.
+Duckbill is a **Privacy-first** AI CLI and Server natively written in Dart for high performance. It enables remote AI-powered agent execution over a secure N-N WebSocket architecture, with **local** suggestion execution (like Claude Code), an interactive terminal menu, and reusable packages following **SOLID** and **Clean Architecture** principles.
 
 _Read in other languages: [Português](README.md), [Español](README-es.md)._
 
+---
+
 ## ✨ Features
 
-- **Privacy First:** Less data footprint, you hold complete control and exclusively isolate the AI executions.
-- **N-N Architecture:** Seamlessly interconnect multiple clients (CLIs) to various concurrent servers.
-- **Autonomous AI & Deep Reasoning:** Defaults natively to the `gemini-3-flash-preview` paired with a HIGH "Thinking Level" to execute thoughtful internal shell decisions tailored to your host machine's architecture environment.
-- **Secure WebSocket Tunneling:** Built-in end-to-end payload transit encryption spanning from TLS Pinning configurations seamlessly validated through standard HMAC-SHA256 handshake tokens per message via precise TTLS timeout protocols.
-- **Local Credential Storage:** Secured Personal Access Tokens (PATs) locally housed in AES-256-GCM sealed envelopes mechanism.
-- **Optimized Storage Backing:** High-concurrency sqlite connection utilizing system C++ FFI layers optimized to write ahead logs (WAL) to robustly sustain constant polling from multiple simultaneous endpoints.
+- **Privacy First:** You decide where and how AI runs — minimal data collection.
+- **N-N Architecture:** Connect multiple clients to multiple servers over WebSocket.
+- **Local Suggestion Execution:** The client receives AI suggestions and executes them **on your machine** with per-suggestion approval — just like Claude Code or OpenClaw.
+- **Remote Model Configuration:** The server pushes model/provider info via a `config` frame after the WebSocket handshake. The client doesn't need to know the AI configuration in advance.
+- **Interactive Console Menu:** Run `duckbill` with no arguments to enter interactive mode with a numbered menu and AI chat interface.
+- **Typed Message Protocol:** Structured JSON frames (`prompt`, `response`, `suggestion`, `execution_result`, `config`, `stream_end`, `error`) for precise routing.
+- **Secure WebSocket Tunnel:** Bearer Token handshake + HMAC-SHA256 with 180s TTL on every payload.
+- **Local Credential Storage:** PATs encrypted with AES-256-GCM in `~/.duckbill/keys/`.
+- **SQLite Database:** WAL mode, native FFI bindings, high concurrency.
+- **Test Coverage ≥ 90%:** Comprehensive test suites across all packages.
 
 ---
 
-## 🛠️ Original Architectural Plan Deviations
+## 🏗️ Architecture (SOLID + Clean Architecture)
 
-In order to better align the project codebase to standard native conventions and provide immediate stable FFI abstraction mappings, slight modifications were made to the original ideal layout structure:
+```
+┌─────────────────────────────────────────────────────┐
+│               Presentation Layer                    │
+│         CLI (duckbill) · Interactive Menu           │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│           Application / Use-Case Layer              │
+│       AgentSession · InteractiveRunner              │
+└──────────┬──────────────────────┬───────────────────┘
+           │                      │
+┌──────────▼──────────┐  ┌────────▼───────────────────┐
+│    Domain Layer     │  │   Infrastructure Layer      │
+│  AiSuggestion       │  │  duckbill_crypto  (AES-GCM) │
+│  ExecutionGate      │  │  duckbill_storage (SQLite)  │
+│  LocalExecutor      │  │  duckbill_protocol (WS+HMAC)│
+│  MessageFrame       │  │  duckbill_ai      (Gemini)  │
+└─────────────────────┘  └────────────────────────────┘
+```
 
-1. **Folder Scaffold Remodeling:** Instead of tucking apps into an aggregate generic `apps/` base folder and nesting huge bulk monolith packages down in one giant chunk core, they were atomized. Independent packages trace independently to (`packages/duckbill_ai`, `packages/duckbill_crypto`, `packages/duckbill_protocol`, and `packages/duckbill_storage`), keeping `cli/` and `server/` isolated strictly on their own root directories preventing cross-injection pollution bindings.
-2. **Compilation Infrastructure Overhaul:** The initial prompt specified using `dart compile exe`. By adopting `sqlite3` alongside cutting edge generic Dynamic C++ FFI bindings integrations, the strategy shifted modernly into `dart build cli`. Such approach guarantees the extraction of dependent `.dylib`/`.so` linked libraries paired in exact tandem with the main binary output.
-3. **Internal Autonomy Empowerments:** The AI model doesn't just reply gracefully via generic raw markdown answers anymore. Advanced functional structures parse incoming queries specifically formatting payload requests mapped out in strict actionable command blocks bridging natively back to the host bash server tunneling mechanism under WebSocket.
+### Packages
+
+| Package | Responsibility |
+|---|---|
+| `duckbill_crypto` | AES-256-GCM encryption, PAT storage |
+| `duckbill_storage` | SQLite (WAL), JSON config |
+| `duckbill_protocol` | WebSocket, HMAC-SHA256, `MessageFrame`, `MessageRouter`, `ClientRegistry` |
+| `duckbill_ai` | Gemini adapter, `FunctionParser` |
+| `duckbill_agent` | `AgentSession`, `LocalExecutor`, `ExecutionGate`, `SuggestionParser` |
+| `duckbill_console` | Interactive menu, chat TUI, ANSI styles |
 
 ---
 
-## 💻 Local Development Setup (How to run locally)
+## 💻 Usage
 
-Throughout standard development phases, running pure Dart components combined with simple base JIT compilation hot restarts allows minimal overhead execution natively in the shell.
+### Interactive Mode (New!)
 
-1. **Start the local server:**
-   Navigate internally, provide your AI remote access key natively through enviroment shells, and spin the server upon the default port 8080:
-
-```bash
-cd server
-export GEMINI_API_KEY="YOUR_KEY_HERE"
-dart run bin/server.dart
-```
-
-2. **Generate your authentication base PAT Token in parallel mode:**
+Run without arguments to get the menu:
 
 ```bash
-cd cli
-dart run bin/cli.dart auth login --token YOUR_SECRET_ACCESS_TOKEN
-```
-
-3. **Establish CLI payload handshakes mapping Server Tunneled AI execution:**
-
-```bash
-cd cli
-dart run bin/cli.dart agent run "Check available disk storage on this computer."
-```
-
----
-
-## 🚀 Building & Deploying (Production Workloads)
-
-Refrain from manually dealing with compiling cross-machine OS architectures natively. Let CI/CD continuous delivery take control exclusively through **GitHub Actions**.
-
-Whenever committing pushes onto your `main` primary branch, remote headless Ubuntu CI runners efficiently build analyzer passes, generate absolute test coverage mappings (`lcov`), build complete standalone AOT bundle pipelines and inject out fully deployable native `.tar.gz` Duckbill Artifact releases.
-
-Download Duckbill's production package natively shipped alongside independent C++ local libraries statically linked:
-
-```bash
-# Retrieve the package zip file bundle (Swap URL corresponding to your real artifact target branch endpoint)
-curl -LO https://github.com/yourrepo/duckbill/releases/latest/download/duckbill-server-linux-amd64.tar.gz
-
-# Extract the looped unzipped container path bounds
-mkdir -p /DATA/.local/opt/duckbill
-tar -xzf duckbill-server-linux-amd64.tar.gz -C /DATA/.local/opt/duckbill
-
-# Deploy global executable standalone symlink routes natively bypassing full path
-ln -s /DATA/.local/opt/duckbill/bin/server /DATA/.local/bin/duckbill
-
-# You're live! 🦆
 duckbill
 ```
+
+Menu options:
+- **Interactive AI Session** — multi-turn chat with per-suggestion approval
+- **Run Single Prompt** — send one prompt and exit
+- **Save Auth Token** — store your PAT encrypted
+- **Start Server** — launch the WebSocket server
+- **Version Info** / **Update**
+
+### Command Line
+
+#### 1. Save your authentication token
+
+```bash
+duckbill auth login --token YOUR_SECRET_TOKEN
+```
+
+#### 2. Start the server
+
+```bash
+export GEMINI_API_KEY="YOUR_GEMINI_KEY"
+duckbill server start --port 8080
+```
+
+#### 3. Interactive session (Claude Code style)
+
+```bash
+# Manual approval for each suggestion:
+duckbill agent interactive
+
+# Auto-approve (CI/automated pipelines):
+duckbill agent interactive --auto-approve
+```
+
+#### 4. Single prompt
+
+```bash
+duckbill agent run "Check disk space."
+duckbill agent run --auto-approve "List running processes."
+```
+
+---
+
+## 🔐 Security
+
+| Layer | Mechanism |
+|---|---|
+| WebSocket Handshake | Bearer Token in `Authorization` header |
+| Payload | HMAC-SHA256 signature + 180s TTL |
+| Local storage | AES-256-GCM in `~/.duckbill/keys/auth.json` |
+| Execution approval | Interactive gate (user approves each suggestion) |
+
+---
+
+## 📦 Message Protocol
+
+All communication uses structured JSON frames:
+
+```json
+// Client → Server
+{"type": "prompt",           "payload": {"text": "..."}, "ts": 1234567890}
+
+// Server → Client (after handshake)
+{"type": "config",           "payload": {"model": "gemini-3", "provider": "gemini"}, "ts": ...}
+
+// Server → Client (AI response)
+{"type": "suggestion",       "payload": {"command": "ls -la", "explanation": "..."}, "ts": ...}
+{"type": "response",         "payload": {"text": "..."}, "ts": ...}
+{"type": "stream_end",       "payload": {}, "ts": ...}
+
+// Client → Server (local execution result)
+{"type": "execution_result", "payload": {"exit_code": 0, "stdout": "...", "stderr": ""}, "ts": ...}
+```
+
+---
+
+## 🚀 Build and Deploy
+
+The CI/CD pipeline (GitHub Actions) builds for multiple platforms when you push a `v*` tag:
+
+```bash
+git tag v1.0.0 && git push --tags
+```
+
+Platforms: Linux x86_64/ARM64, macOS Intel/Apple Silicon, Windows x86_64.
+
+Manual install:
+
+```bash
+curl -LO https://github.com/YOUR_REPO/duckbill/releases/latest/download/duckbill-cli-linux-amd64.tar.gz
+mkdir -p ~/.local/opt/duckbill && tar -xzf duckbill-cli-linux-amd64.tar.gz -C ~/.local/opt/duckbill
+ln -s ~/.local/opt/duckbill/bin/cli ~/.local/bin/duckbill
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol \
+           packages/duckbill_ai packages/duckbill_agent packages/duckbill_console server cli; do
+  (cd $dir && dart test)
+done
+```
+
+Target coverage: **≥ 90%** per package.
+
+---
+
+## 🛠️ Architectural Changes from Original Plan
+
+1. **Local Execution:** Instead of the server executing commands on the server, the **client** receives suggestions and executes them locally, with per-suggestion approval. The server acts as a router/orchestrator, not an executor.
+2. **Typed Protocol:** All WebSocket frames now carry a `type` + `payload` JSON envelope, eliminating fragile string parsing.
+3. **New Packages:** `duckbill_agent` (local execution + approval gate) and `duckbill_console` (TUI menu + ANSI styles).
+4. **SOLID Server:** `DuckbillServer` delegates to `ClientHandler`, `AiRequestHandler`, `ConfigSyncHandler`, `ClientRegistry`, and `MessageRouter`.
+5. **Interactive Menu:** The CLI detects missing arguments and presents a TUI-style interactive menu.

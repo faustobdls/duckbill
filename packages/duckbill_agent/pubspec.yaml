@@ -1,0 +1,17 @@
+name: duckbill_agent
+description: Duckbill AI agent execution engine — local command execution with approval gate and session management.
+version: 1.0.0
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  duckbill_ai:
+    path: ../duckbill_ai
+  duckbill_protocol:
+    path: ../duckbill_protocol
+
+dev_dependencies:
+  coverage: ^1.15.0
+  lints: ^6.0.0
+  test: ^1.30.0

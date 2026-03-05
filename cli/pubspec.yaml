@@ -1,7 +1,6 @@
 name: cli
-description: A sample command-line application.
+description: Duckbill CLI — privacy-first AI orchestration with interactive menu.
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
 
 publish_to: none
 
@@ -14,6 +13,10 @@ dependencies:
   path: ^1.9.0
   duckbill_crypto:
     path: ../packages/duckbill_crypto
+  duckbill_agent:
+    path: ../packages/duckbill_agent
+  duckbill_console:
+    path: ../packages/duckbill_console
   server:
     path: ../server
 
