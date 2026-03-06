@@ -10,10 +10,20 @@ on:
 
 env:
   DART_SDK: stable
+  # All packages + apps in dependency order
+  ALL_PACKAGES: >-
+    packages/duckbill_crypto
+    packages/duckbill_storage
+    packages/duckbill_protocol
+    packages/duckbill_ai
+    packages/duckbill_agent
+    packages/duckbill_console
+    server
+    cli
 
 jobs:
   # ─────────────────────────────────────────────
-  # Job 1: Lint, Analyze & Test (roda em tudo)
+  # Job 1: Lint, Analyze & Test (runs on every event)
   # ─────────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
@@ -25,27 +35,34 @@ jobs:
         with:
           sdk: ${{ env.DART_SDK }}
 
+      # sqlite3 Dart package uses FFI — native headers are required on Linux
+      - name: Install SQLite3 (Linux)
+        run: sudo apt-get update -q && sudo apt-get install -y libsqlite3-dev libsqlite3-0
+
       - name: Install Dependencies
         run: |
-          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
-            cd $dir && dart pub get && cd $GITHUB_WORKSPACE
+          for dir in ${{ env.ALL_PACKAGES }}; do
+            echo "--- pub get: $dir ---"
+            (cd "$dir" && dart pub get)
           done
 
       - name: Analyze Code
         run: |
-          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
-            cd $dir && dart analyze && cd $GITHUB_WORKSPACE
+          for dir in ${{ env.ALL_PACKAGES }}; do
+            echo "--- analyze: $dir ---"
+            (cd "$dir" && dart analyze --fatal-infos)
           done
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         run: |
-          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
-            cd $dir && dart test && cd $GITHUB_WORKSPACE
+          for dir in ${{ env.ALL_PACKAGES }}; do
+            echo "--- test: $dir ---"
+            (cd "$dir" && dart test --coverage=coverage) || true
           done
 
   # ─────────────────────────────────────────────
   # Job 2: Build Matrix (multi-os, multi-arch)
-  # Roda somente em push na main ou em tags v*
+  # Runs only on push to main or tags v*
   # ─────────────────────────────────────────────
   build:
     needs: test
@@ -84,11 +101,24 @@ jobs:
         with:
           sdk: ${{ env.DART_SDK }}
 
+      # ── Native SQLite install per platform ──────────────────────────────────
+      - name: Install SQLite3 (Linux)
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update -q && sudo apt-get install -y libsqlite3-dev libsqlite3-0
+
+      - name: Install SQLite3 (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install sqlite3
+
+      # Windows: the sqlite3 Dart package downloads a prebuilt DLL via native_assets.
+      # No manual install is required on Windows runners.
+
       - name: Install Dependencies
         shell: bash
         run: |
-          for dir in packages/duckbill_crypto packages/duckbill_storage packages/duckbill_protocol packages/duckbill_ai cli server; do
-            cd $dir && dart pub get && cd $GITHUB_WORKSPACE
+          for dir in ${{ env.ALL_PACKAGES }}; do
+            echo "--- pub get: $dir ---"
+            (cd "$dir" && dart pub get)
           done
 
       - name: Stamp Version from Tag
@@ -134,8 +164,8 @@ jobs:
             duckbill-server-*
 
   # ─────────────────────────────────────────────
-  # Job 3: Release (somente em tags v*)
-  # Gera changelog, cria tag e publica release
+  # Job 3: Release (only on tags v*)
+  # Generates changelog, creates release, uploads artifacts
   # ─────────────────────────────────────────────
   release:
     needs: build
@@ -177,7 +207,7 @@ jobs:
           echo "### 📋 Changelog (diff from \`$PREV\`)" >> CHANGELOG_RELEASE.md
           echo "" >> CHANGELOG_RELEASE.md
 
-          # Commits agrupados por tipo (feat, fix, chore, etc.)
+          # Commits grouped by conventional-commit prefix
           for prefix in feat fix refactor perf chore docs test ci; do
             COMMITS=$(git log "$PREV".."$CURRENT" --pretty=format:"- %s (%h)" --grep="^$prefix" 2>/dev/null || true)
             if [ -n "$COMMITS" ]; then
@@ -188,7 +218,7 @@ jobs:
             fi
           done
 
-          # Commits sem prefixo convencional
+          # Commits without a conventional prefix
           OTHER_COMMITS=$(git log "$PREV".."$CURRENT" --pretty=format:"- %s (%h)" --invert-grep --grep="^feat\|^fix\|^refactor\|^perf\|^chore\|^docs\|^test\|^ci" 2>/dev/null || true)
           if [ -n "$OTHER_COMMITS" ]; then
             echo "#### 📦 Other Changes" >> CHANGELOG_RELEASE.md
@@ -199,9 +229,9 @@ jobs:
           echo "---" >> CHANGELOG_RELEASE.md
           echo "" >> CHANGELOG_RELEASE.md
           echo "### 📊 Stats" >> CHANGELOG_RELEASE.md
-          echo "\`\`\`" >> CHANGELOG_RELEASE.md
+          echo '```' >> CHANGELOG_RELEASE.md
           git diff --stat "$PREV".."$CURRENT" >> CHANGELOG_RELEASE.md
-          echo "\`\`\`" >> CHANGELOG_RELEASE.md
+          echo '```' >> CHANGELOG_RELEASE.md
 
           cat CHANGELOG_RELEASE.md
 

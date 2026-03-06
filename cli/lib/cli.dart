@@ -5,6 +5,9 @@ import 'package:server/server.dart';
 
 import 'src/version.dart';
 import 'src/updater.dart';
+import 'src/interactive_runner.dart';
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
 
 class AuthLoginCommand extends Command {
   @override
@@ -28,61 +31,6 @@ class AuthLoginCommand extends Command {
   }
 }
 
-class ServerStartCommand extends Command {
-  @override
-  final name = 'start';
-  @override
-  final description = 'Starts the Duckbill Server wrapper.';
-
-  ServerStartCommand() {
-    argParser.addOption('db', help: 'Path to sqlite db', defaultsTo: 'duckbill.sqlite');
-    argParser.addOption('apikey', help: 'Gemini API Key');
-    argParser.addOption('port', abbr: 'p', help: 'Port', defaultsTo: '8080');
-    argParser.addOption('model', abbr: 'm', help: 'Gemini model to use', defaultsTo: 'gemini-3-flash-preview');
-  }
-
-  @override
-  void run() async {
-    final startTime = DateTime.now();
-    
-    var apiKey = argResults?['apikey'] as String?;
-    apiKey ??= Platform.environment['GEMINI_API_KEY'];
-    
-    if (apiKey == null || apiKey.isEmpty) {
-      print('Missing API key. Provide --apikey or set GEMINI_API_KEY');
-      return;
-    }
-    
-    final dbPath = argResults?['db'] as String;
-    final portStr = argResults?['port'] as String;
-    final port = int.tryParse(portStr) ?? 8080;
-
-    print('[Metrics] Initializing Duckbill Server...');
-    
-    try {
-      final server = await DuckbillServer.initialize(
-        dbPath: dbPath,
-        apiKey: apiKey,
-        model: argResults?['model'] as String? ?? 'gemini-3-flash-preview',
-      );
-      
-      final initTime = DateTime.now().difference(startTime);
-      print('[Metrics] Server initialized in ' + initTime.inMilliseconds.toString() + 'ms');
-
-      // Hook up graceful shutdown
-      ProcessSignal.sigint.watch().listen((signal) async {
-        print('\\n[Metrics] Shutting down server...');
-        await server.stop();
-        exit(0);
-      });
-
-      await server.start(address: '0.0.0.0', port: port);
-    } catch (e) {
-      print('[Error] Failed to start server: ' + e.toString());
-    }
-  }
-}
-
 class AuthCommand extends Command {
   @override
   final name = 'auth';
@@ -91,6 +39,62 @@ class AuthCommand extends Command {
 
   AuthCommand() {
     addSubcommand(AuthLoginCommand());
+  }
+}
+
+// ─── Server ──────────────────────────────────────────────────────────────────
+
+class ServerStartCommand extends Command {
+  @override
+  final name = 'start';
+  @override
+  final description = 'Starts the Duckbill Server.';
+
+  ServerStartCommand() {
+    argParser.addOption('db', help: 'Path to SQLite DB', defaultsTo: 'duckbill.sqlite');
+    argParser.addOption('apikey', help: 'Gemini API Key');
+    argParser.addOption('port', abbr: 'p', help: 'Port', defaultsTo: '8080');
+    argParser.addOption('model', abbr: 'm', help: 'AI model', defaultsTo: 'gemini-3-flash-preview');
+  }
+
+  @override
+  void run() async {
+    final startTime = DateTime.now();
+
+    var apiKey = argResults?['apikey'] as String?;
+    apiKey ??= Platform.environment['GEMINI_API_KEY'];
+
+    if (apiKey == null || apiKey.isEmpty) {
+      print('Missing API key. Provide --apikey or set GEMINI_API_KEY');
+      return;
+    }
+
+    final dbPath = argResults?['db'] as String;
+    final portStr = argResults?['port'] as String;
+    final port = int.tryParse(portStr) ?? 8080;
+
+    print('[Metrics] Initializing Duckbill Server...');
+
+    try {
+      final server = await DuckbillServer.initialize(
+        dbPath: dbPath,
+        apiKey: apiKey,
+        model: argResults?['model'] as String? ?? 'gemini-3-flash-preview',
+      );
+
+      final initTime = DateTime.now().difference(startTime);
+      print('[Metrics] Server initialized in ' + initTime.inMilliseconds.toString() + 'ms');
+
+      ProcessSignal.sigint.watch().listen((signal) async {
+        print('\n[Metrics] Shutting down server...');
+        await server.stop();
+        exit(0);
+      });
+
+      await server.start(address: '0.0.0.0', port: port);
+    } catch (e) {
+      print('[Error] Failed to start server: ' + e.toString());
+    }
   }
 }
 
@@ -105,14 +109,20 @@ class ServerCommand extends Command {
   }
 }
 
+// ─── Agent ───────────────────────────────────────────────────────────────────
+
+/// Sends a single prompt to the server and prints the result.
+///
+/// For a full interactive session, use [AgentInteractiveCommand].
 class AgentRunCommand extends Command {
   @override
   final name = 'run';
   @override
-  final description = 'Prompts the Duckbill AI Server securely.';
-  
+  final description = 'Sends a single prompt to the Duckbill AI Server.';
+
   AgentRunCommand() {
     argParser.addOption('server', abbr: 's', help: 'Server address', defaultsTo: 'ws://127.0.0.1:8080');
+    argParser.addFlag('auto-approve', abbr: 'y', help: 'Auto-approve all AI suggestions', defaultsTo: false);
   }
 
   @override
@@ -130,31 +140,45 @@ class AgentRunCommand extends Command {
     }
 
     final serverUrl = argResults?['server'] as String;
-    
-    try {
-      final ws = await WebSocket.connect(
-        serverUrl + '/',
-        headers: {'Authorization': 'Bearer ' + token},
-      );
-      
-      ws.listen((data) {
-        print(data); // print Server updates and command streams
-        if (data.toString().contains('[Server] Execução concluída.') || 
-            data.toString().startsWith('AI Resposta:')) {
-          ws.close(); // Finish cleanly after streaming the whole process
-        }
-      }, onError: (e) {
-        print('[Error] Server connection error: ' + e.toString());
-      }, onDone: () {
-        exit(0);
-      });
+    final autoApprove = argResults?['auto-approve'] as bool? ?? false;
 
-      // Send the prompt
-      ws.add(prompt);
-      
-    } catch (e) {
-      print('[Error] Failed to connect to server at ' + serverUrl + ' : ' + e.toString());
+    await InteractiveRunner.runSinglePrompt(
+      serverUrl: serverUrl,
+      token: token,
+      prompt: prompt,
+      autoApprove: autoApprove,
+    );
+  }
+}
+
+/// Launches a full interactive chat session similar to Claude Code.
+class AgentInteractiveCommand extends Command {
+  @override
+  final name = 'interactive';
+  @override
+  final description = 'Starts an interactive AI chat session (Claude Code style).';
+
+  AgentInteractiveCommand() {
+    argParser.addOption('server', abbr: 's', help: 'Server address', defaultsTo: 'ws://127.0.0.1:8080');
+    argParser.addFlag('auto-approve', abbr: 'y', help: 'Auto-approve all AI suggestions', defaultsTo: false);
+  }
+
+  @override
+  void run() async {
+    final token = await CryptoManager.getEncryptedPat();
+    if (token == null) {
+      print('[Error] No token found. Please run `duckbill auth login --token YOUR_TOKEN` first.');
+      return;
     }
+
+    final serverUrl = argResults?['server'] as String;
+    final autoApprove = argResults?['auto-approve'] as bool? ?? false;
+
+    await InteractiveRunner.runInteractiveSession(
+      serverUrl: serverUrl,
+      token: token,
+      autoApprove: autoApprove,
+    );
   }
 }
 
@@ -166,8 +190,11 @@ class AgentCommand extends Command {
 
   AgentCommand() {
     addSubcommand(AgentRunCommand());
+    addSubcommand(AgentInteractiveCommand());
   }
 }
+
+// ─── Update / Version ────────────────────────────────────────────────────────
 
 class UpdateCommand extends Command {
   @override
@@ -203,14 +230,24 @@ class VersionCommand extends Command {
   }
 }
 
+// ─── Entry point ─────────────────────────────────────────────────────────────
+
+/// Main wrapper — delegates to [InteractiveRunner.showMainMenu] when no
+/// arguments are provided (interactive/TUI mode).
 void mainWrapper(List<String> arguments) async {
+  // No arguments → show interactive menu.
+  if (arguments.isEmpty) {
+    await InteractiveRunner.showMainMenu();
+    return;
+  }
+
   final runner = CommandRunner('duckbill', 'Duckbill CLI v$duckbillVersion — AI orchestration.')
     ..addCommand(AuthCommand())
     ..addCommand(ServerCommand())
     ..addCommand(AgentCommand())
     ..addCommand(UpdateCommand())
     ..addCommand(VersionCommand());
-    
+
   try {
     await runner.run(arguments);
   } catch (e) {
