@@ -2,51 +2,6 @@ import 'dart:io';
 import 'package:duckbill_agent/duckbill_agent.dart';
 import 'package:test/test.dart';
 
-// ─── Stubs ───────────────────────────────────────────────────────────────────
-
-class _AlwaysApproveGate implements ExecutionGate {
-  final List<AiSuggestion> evaluated = [];
-
-  @override
-  Future<GateResult> evaluate(AiSuggestion suggestion) async {
-    evaluated.add(suggestion);
-    return GateResult(decision: GateDecision.approved, suggestion: suggestion);
-  }
-}
-
-class _AlwaysSkipGate implements ExecutionGate {
-  @override
-  Future<GateResult> evaluate(AiSuggestion suggestion) async =>
-      GateResult(decision: GateDecision.skipped, suggestion: suggestion);
-}
-
-class _AlwaysCancelGate implements ExecutionGate {
-  @override
-  Future<GateResult> evaluate(AiSuggestion suggestion) async =>
-      GateResult(decision: GateDecision.cancelled, suggestion: suggestion);
-}
-
-class _StubExecutor implements LocalExecutor {
-  final List<AiSuggestion> executed = [];
-  final int exitCode;
-  final String stdout;
-  final String stderr;
-
-  _StubExecutor({this.exitCode = 0, this.stdout = 'ok', this.stderr = ''});
-
-  @override
-  Future<ExecutionResult> execute(AiSuggestion suggestion) async {
-    executed.add(suggestion);
-    return ExecutionResult(
-      suggestion: suggestion,
-      exitCode: exitCode,
-      stdout: stdout,
-      stderr: stderr,
-      elapsed: const Duration(milliseconds: 10),
-    );
-  }
-}
-
 // ─── AiSuggestion ────────────────────────────────────────────────────────────
 
 void main() {
