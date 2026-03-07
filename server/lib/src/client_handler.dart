@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:duckbill_protocol/duckbill_protocol.dart';
 
@@ -22,7 +23,7 @@ class ClientHandler {
   /// Starts listening to the client's WebSocket stream.
   void listen() {
     socket.listen(
-      (data) => _onData(data),
+      (data) => unawaited(_onData(data)),
       onDone: _onDone,
       onError: _onError,
     );
