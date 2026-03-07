@@ -1,4 +1,4 @@
 /// Package for cryptographic operations.
-library duckbill_crypto;
+library;
 
 export 'src/crypto_manager.dart';
