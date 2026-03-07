@@ -245,7 +245,7 @@ void main() {
       await server.close(force: true);
     });
 
-    Future<WebSocket> _makeWs() async {
+    Future<WebSocket> makeWs() async {
       final clientFuture = WebSocket.connect('ws://127.0.0.1:${server.port}/');
       final serverReq = await server.first;
       final serverWs = await WebSocketTransformer.upgrade(serverReq);
@@ -256,8 +256,8 @@ void main() {
     }
 
     test('register and count', () async {
-      ws1 = await _makeWs();
-      ws2 = await _makeWs();
+      ws1 = await makeWs();
+      ws2 = await makeWs();
 
       final registry = ClientRegistry();
       registry.register('a', ws1);
@@ -270,8 +270,8 @@ void main() {
     });
 
     test('unregister removes client', () async {
-      ws1 = await _makeWs();
-      ws2 = await _makeWs();
+      ws1 = await makeWs();
+      ws2 = await makeWs();
 
       final registry = ClientRegistry();
       registry.register('a', ws1);
@@ -282,16 +282,16 @@ void main() {
     });
 
     test('get returns null for unknown id', () async {
-      ws1 = await _makeWs();
-      ws2 = await _makeWs();
+      ws1 = await makeWs();
+      ws2 = await makeWs();
 
       final registry = ClientRegistry();
       expect(registry.get('nobody'), isNull);
     });
 
     test('get returns info for registered client', () async {
-      ws1 = await _makeWs();
-      ws2 = await _makeWs();
+      ws1 = await makeWs();
+      ws2 = await makeWs();
 
       final registry = ClientRegistry();
       registry.register('x', ws1);
@@ -301,8 +301,8 @@ void main() {
     });
 
     test('all returns all registered clients', () async {
-      ws1 = await _makeWs();
-      ws2 = await _makeWs();
+      ws1 = await makeWs();
+      ws2 = await makeWs();
 
       final registry = ClientRegistry();
       registry.register('a', ws1);
