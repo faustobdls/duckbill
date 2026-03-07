@@ -1,6 +1,6 @@
 import 'package:duckbill_crypto/duckbill_crypto.dart';
 
-void main() async {
+Future<void> main() async {
   final manager = CryptoManager();
   final key = await manager.algorithm.newSecretKey();
   

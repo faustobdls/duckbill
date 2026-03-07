@@ -18,7 +18,7 @@ class GeminiAdapter implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt, {String? systemInstruction}) async {
-    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey);
+    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey');
     
     final payload = {
       if (systemInstruction != null)
@@ -46,14 +46,14 @@ class GeminiAdapter implements AiProvider {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to generate content: ' + response.body);
+      throw Exception('Failed to generate content: ${response.body}');
     }
 
     final data = jsonDecode(response.body);
     try {
       return data['candidates'][0]['content']['parts'][0]['text'] as String;
     } catch (e) {
-      throw Exception('Failed to parse Gemini response: ' + data.toString());
+      throw Exception('Failed to parse Gemini response: $data');
     }
   }
 }

@@ -32,6 +32,6 @@ class SqliteDbManager {
   }
 
   void dispose() {
-    db.dispose();
+    db.close();
   }
 }

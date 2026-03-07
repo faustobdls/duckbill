@@ -9,7 +9,7 @@ class DuckbillSecurity {
 
   /// Generates HMAC signature for a given payload and timestamp
   String sign(String payload, int timestampMs) {
-    var data = payload + ':' + timestampMs.toString();
+    var data = '$payload:$timestampMs';
     final hmac = Hmac(sha256, utf8.encode(secretToken));
     final digest = hmac.convert(utf8.encode(data));
     return digest.toString();

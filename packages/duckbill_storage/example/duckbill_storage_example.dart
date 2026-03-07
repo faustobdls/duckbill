@@ -1,6 +1,7 @@
 import 'package:duckbill_storage/duckbill_storage.dart';
 
-void main() {
+Future<void> main() async {
   final manager = JsonConfigManager('config.json');
-  manager.load().then((value) => print(value));
+  final value = await manager.load();
+  print(value);
 }

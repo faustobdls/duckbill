@@ -20,14 +20,14 @@ class AuthLoginCommand extends Command {
   }
 
   @override
-  void run() async {
+  Future<void> run() async {
     final token = argResults?['token'] as String?;
     if (token == null) {
       print('Please provide a token using --token or -t');
       return;
     }
     await CryptoManager.saveEncryptedPat(token);
-    print('Token saved successfully to ' + CryptoManager.getDuckbillKeysPath());
+    print('Token saved successfully to ${CryptoManager.getDuckbillKeysPath()}');
   }
 }
 
@@ -58,7 +58,7 @@ class ServerStartCommand extends Command {
   }
 
   @override
-  void run() async {
+  Future<void> run() async {
     final startTime = DateTime.now();
 
     var apiKey = argResults?['apikey'] as String?;
@@ -83,7 +83,7 @@ class ServerStartCommand extends Command {
       );
 
       final initTime = DateTime.now().difference(startTime);
-      print('[Metrics] Server initialized in ' + initTime.inMilliseconds.toString() + 'ms');
+      print('[Metrics] Server initialized in ${initTime.inMilliseconds}ms');
 
       ProcessSignal.sigint.watch().listen((signal) async {
         print('\n[Metrics] Shutting down server...');
@@ -93,7 +93,7 @@ class ServerStartCommand extends Command {
 
       await server.start(address: '0.0.0.0', port: port);
     } catch (e) {
-      print('[Error] Failed to start server: ' + e.toString());
+      print('[Error] Failed to start server: $e');
     }
   }
 }
@@ -126,7 +126,7 @@ class AgentRunCommand extends Command {
   }
 
   @override
-  void run() async {
+  Future<void> run() async {
     final prompt = argResults?.rest.join(' ');
     if (prompt == null || prompt.isEmpty) {
       print('Please provide a prompt. Example: duckbill agent run "Hello AI"');
@@ -164,7 +164,7 @@ class AgentInteractiveCommand extends Command {
   }
 
   @override
-  void run() async {
+  Future<void> run() async {
     final token = await CryptoManager.getEncryptedPat();
     if (token == null) {
       print('[Error] No token found. Please run `duckbill auth login --token YOUR_TOKEN` first.');
@@ -208,7 +208,7 @@ class UpdateCommand extends Command {
   }
 
   @override
-  void run() async {
+  Future<void> run() async {
     final repo = argResults?['repo'] as String? ?? duckbillRepo;
     final binaryType = argResults?['type'] as String? ?? 'server';
     final updater = DuckbillUpdater(repo: repo);
@@ -234,7 +234,7 @@ class VersionCommand extends Command {
 
 /// Main wrapper — delegates to [InteractiveRunner.showMainMenu] when no
 /// arguments are provided (interactive/TUI mode).
-void mainWrapper(List<String> arguments) async {
+Future<void> mainWrapper(List<String> arguments) async {
   // No arguments → show interactive menu.
   if (arguments.isEmpty) {
     await InteractiveRunner.showMainMenu();

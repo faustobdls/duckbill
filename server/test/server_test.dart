@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:duckbill_ai/duckbill_ai.dart';
 import 'package:duckbill_protocol/duckbill_protocol.dart';
@@ -63,7 +64,7 @@ void main() {
       );
 
       const port = 19090;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       final token = server.security.secretToken;
@@ -109,7 +110,7 @@ void main() {
       );
 
       const port = 19091;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       bool failed = false;
@@ -133,7 +134,7 @@ void main() {
       );
 
       const port = 19092;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       final token = server.security.secretToken;
@@ -169,7 +170,7 @@ void main() {
       await httpServer.close(force: true);
     });
 
-    Future<(WebSocket serverWs, WebSocket clientWs)> _makeWsPair() async {
+    Future<(WebSocket serverWs, WebSocket clientWs)> makeWsPair() async {
       final clientFuture = WebSocket.connect('ws://127.0.0.1:${httpServer.port}/');
       final serverReq = await httpServer.first;
       final serverWs = await WebSocketTransformer.upgrade(serverReq);
@@ -178,7 +179,7 @@ void main() {
     }
 
     test('sends error frame when prompt is empty', () async {
-      final (serverWs, clientWs) = await _makeWsPair();
+      final (serverWs, clientWs) = await makeWsPair();
       final received = <String>[];
       clientWs.listen((d) { if (d is String) received.add(d); });
 
@@ -200,7 +201,7 @@ void main() {
     });
 
     test('sends error frame when AI throws', () async {
-      final (serverWs, clientWs) = await _makeWsPair();
+      final (serverWs, clientWs) = await makeWsPair();
       final received = <String>[];
       clientWs.listen((d) { if (d is String) received.add(d); });
 

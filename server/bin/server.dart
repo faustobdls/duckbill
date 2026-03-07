@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:server/server.dart';
 
-void main(List<String> arguments) async {
+Future<void> main(List<String> arguments) async {
   final apiKey = Platform.environment['GEMINI_API_KEY'];
   if (apiKey == null || apiKey.isEmpty) {
     print('Missing GEMINI_API_KEY env var.');

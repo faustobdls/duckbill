@@ -1,4 +1,4 @@
-library duckbill_protocol;
+library;
 
 export 'src/security.dart';
 export 'src/tunnel.dart';
