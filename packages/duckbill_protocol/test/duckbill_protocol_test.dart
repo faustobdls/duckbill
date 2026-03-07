@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:duckbill_protocol/duckbill_protocol.dart';
@@ -232,23 +233,28 @@ void main() {
 
   group('ClientRegistry', () {
     late HttpServer server;
-    late WebSocket ws1;
-    late WebSocket ws2;
+    late StreamIterator<HttpRequest> serverIter;
+    WebSocket? ws1;
+    WebSocket? ws2;
 
     setUp(() async {
       server = await HttpServer.bind('127.0.0.1', 0);
+      serverIter = StreamIterator(server);
     });
 
     tearDown(() async {
-      await ws1.close().catchError((_) {});
-      await ws2.close().catchError((_) {});
+      await ws1?.close().catchError((_) {});
+      await ws2?.close().catchError((_) {});
+      ws1 = null;
+      ws2 = null;
+      await serverIter.cancel();
       await server.close(force: true);
     });
 
     Future<WebSocket> makeWs() async {
       final clientFuture = WebSocket.connect('ws://127.0.0.1:${server.port}/');
-      final serverReq = await server.first;
-      final serverWs = await WebSocketTransformer.upgrade(serverReq);
+      await serverIter.moveNext();
+      final serverWs = await WebSocketTransformer.upgrade(serverIter.current);
       final clientWs = await clientFuture;
       // We return server-side socket to register
       await clientWs.close();
@@ -260,8 +266,8 @@ void main() {
       ws2 = await makeWs();
 
       final registry = ClientRegistry();
-      registry.register('a', ws1);
-      registry.register('b', ws2);
+      registry.register('a', ws1!);
+      registry.register('b', ws2!);
 
       expect(registry.count, 2);
       expect(registry.contains('a'), isTrue);
@@ -274,7 +280,7 @@ void main() {
       ws2 = await makeWs();
 
       final registry = ClientRegistry();
-      registry.register('a', ws1);
+      registry.register('a', ws1!);
       registry.unregister('a');
 
       expect(registry.count, 0);
@@ -294,7 +300,7 @@ void main() {
       ws2 = await makeWs();
 
       final registry = ClientRegistry();
-      registry.register('x', ws1);
+      registry.register('x', ws1!);
       final info = registry.get('x');
       expect(info, isNotNull);
       expect(info!.id, 'x');
@@ -305,8 +311,8 @@ void main() {
       ws2 = await makeWs();
 
       final registry = ClientRegistry();
-      registry.register('a', ws1);
-      registry.register('b', ws2);
+      registry.register('a', ws1!);
+      registry.register('b', ws2!);
       expect(registry.all.length, 2);
     });
   });

@@ -89,8 +89,12 @@ class DuckbillUpdater {
     final currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
     // Pad to same length
-    while (remoteParts.length < 3) remoteParts.add(0);
-    while (currentParts.length < 3) currentParts.add(0);
+    while (remoteParts.length < 3) {
+      remoteParts.add(0);
+    }
+    while (currentParts.length < 3) {
+      currentParts.add(0);
+    }
 
     for (var i = 0; i < 3; i++) {
       if (remoteParts[i] > currentParts[i]) return true;
