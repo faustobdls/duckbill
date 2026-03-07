@@ -202,7 +202,7 @@ class DuckbillUpdater {
     // Print changelog snippet
     final body = release['body'] as String;
     if (body.isNotEmpty) {
-      final preview = body.length > 500 ? body.substring(0, 500) + '...' : body;
+      final preview = body.length > 500 ? '${body.substring(0, 500)}...' : body;
       print(preview);
       print('');
     }

@@ -210,7 +210,7 @@ abstract final class InteractiveRunner {
       return;
     }
     await CryptoManager.saveEncryptedPat(token);
-    _print(DuckbillTheme.success('  Token saved to ' + CryptoManager.getDuckbillKeysPath()));
+    _print(DuckbillTheme.success('  Token saved to ${CryptoManager.getDuckbillKeysPath()}'));
   }
 
   // ─── Server ────────────────────────────────────────────────────────────────

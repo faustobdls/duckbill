@@ -27,7 +27,7 @@ class AuthLoginCommand extends Command {
       return;
     }
     await CryptoManager.saveEncryptedPat(token);
-    print('Token saved successfully to ' + CryptoManager.getDuckbillKeysPath());
+    print('Token saved successfully to ${CryptoManager.getDuckbillKeysPath()}');
   }
 }
 
@@ -83,7 +83,7 @@ class ServerStartCommand extends Command {
       );
 
       final initTime = DateTime.now().difference(startTime);
-      print('[Metrics] Server initialized in ' + initTime.inMilliseconds.toString() + 'ms');
+      print('[Metrics] Server initialized in ${initTime.inMilliseconds}ms');
 
       ProcessSignal.sigint.watch().listen((signal) async {
         print('\n[Metrics] Shutting down server...');
@@ -93,7 +93,7 @@ class ServerStartCommand extends Command {
 
       await server.start(address: '0.0.0.0', port: port);
     } catch (e) {
-      print('[Error] Failed to start server: ' + e.toString());
+      print('[Error] Failed to start server: $e');
     }
   }
 }

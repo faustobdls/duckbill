@@ -25,7 +25,7 @@ class AiRequestHandler {
     }
 
     try {
-      final osInfo = Platform.operatingSystem + ' ' + Platform.operatingSystemVersion;
+      final osInfo = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
       final systemInstruction = _buildSystemInstruction(osInfo);
 
       final rawResponse = await aiProvider.generateContent(

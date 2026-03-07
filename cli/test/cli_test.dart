@@ -11,7 +11,7 @@ void main() {
 
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('cli_test_dir');
-      dummyPath = tempDir.path + '/dummy_path.json';
+      dummyPath = '${tempDir.path}/dummy_path.json';
     });
 
     tearDown(() async {
