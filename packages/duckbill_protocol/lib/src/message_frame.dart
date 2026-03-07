@@ -52,7 +52,7 @@ class MessageFrame {
         type: MessageType.response,
         payload: {
           'text': text,
-          ?'model': model,
+          'model': ?model,
         },
       );
 
@@ -86,7 +86,7 @@ class MessageFrame {
         payload: {
           'model': model,
           'provider': provider,
-          ?'system_instruction': systemInstruction,
+          'system_instruction': ?systemInstruction,
         },
       );
 
