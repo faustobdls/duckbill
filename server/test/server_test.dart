@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:duckbill_ai/duckbill_ai.dart';
 import 'package:duckbill_protocol/duckbill_protocol.dart';
@@ -63,7 +64,7 @@ void main() {
       );
 
       const port = 19090;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       final token = server.security.secretToken;
@@ -109,7 +110,7 @@ void main() {
       );
 
       const port = 19091;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       bool failed = false;
@@ -133,7 +134,7 @@ void main() {
       );
 
       const port = 19092;
-      server.start(address: '127.0.0.1', port: port);
+      unawaited(server.start(address: '127.0.0.1', port: port));
       await Future.delayed(const Duration(milliseconds: 150));
 
       final token = server.security.secretToken;
